@@ -177,15 +177,44 @@ def ransac_on_n_best_matches(scan_pc, ref_pc, scan_descriptors, ref_descriptors 
 
     return best_inliers_ratio, best_transformation
 
-def valid_matches(scan_samples,ref_samples,threshold) -> bool:
-    scan_distance_matrix = cdist(
-            scan_samples,
-            scan_samples,
-            "euclidean"
-            )
-    ref_distance_matrix = cdist(
-            ref_samples,
-            ref_samples,
-            "euclidean"
-            )
-    return np.sum(np.absolute(np.subtract(scan_distance_matrix,ref_distance_matrix))) < threshold
+def valid_matches(scan_samples, ref_samples, pair_diff_thresh=0.01, min_consistent_fraction=0.7):
+    """
+    Returns only the SHOT-matched keypoints that preserve geometric structure, for use in ICP.
+    
+    Parameters:
+        scan_samples (Nx3): matched scan points
+        ref_samples (Nx3): matched reference points
+        pair_diff_thresh (float): tolerance for pairwise distance difference
+        min_consistent_fraction (float): minimum fraction of consistent distances a point must have
+
+    Returns:
+        scan_inliers (Mx3), ref_inliers (Mx3): only geometrically valid matches
+    """
+    # Step 1: Compute pairwise distances
+    scan_dists = cdist(scan_samples, scan_samples)  # NxN
+    ref_dists = cdist(ref_samples, ref_samples)     # NxN
+
+    # Step 2: Compute difference matrix
+    dist_diff = np.abs(scan_dists - ref_dists)
+
+    # Step 3: Count consistent pairs per point
+    consistent_counts = np.sum(dist_diff < pair_diff_thresh, axis=1)
+
+    # Step 4: Select points that are consistent with enough others
+    valid_mask = consistent_counts >= (min_consistent_fraction * len(scan_samples))
+
+    # Step 5: Return only valid matches (for ICP)
+    return scan_samples[valid_mask], ref_samples[valid_mask]
+
+    #def valid_matches(scan_samples,ref_samples,threshold) -> bool:
+    #scan_distance_matrix = cdist(
+     #       scan_samples,
+      #      scan_samples,
+      #      "euclidean"
+         #   )
+   # ref_distance_matrix = cdist(
+    #        ref_samples,
+     #       ref_samples,
+      #      "euclidean"
+       #     )
+  #  return np.sum(np.absolute(np.subtract(scan_distance_matrix,ref_distance_matrix))) < threshold
